@@ -1,0 +1,2 @@
+https://github.com/enthec/webappanalyzer (GPL-3.0)
+commit: c68abc6a52c67e65f24cbf76d2ae3a3dac610b86

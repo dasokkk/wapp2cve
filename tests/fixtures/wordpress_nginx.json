@@ -1,0 +1,31 @@
+{
+  "url": "https://example.test/",
+  "final_url": "https://example.test/",
+  "status": 200,
+  "headers": {
+    "server": ["nginx/1.18.0"],
+    "x-powered-by": ["PHP/8.1.2"],
+    "x-pingback": ["https://example.test/xmlrpc.php"],
+    "content-type": ["text/html; charset=UTF-8"]
+  },
+  "cookies": {
+    "PHPSESSID": "3f9a1c2e8b7d"
+  },
+  "meta": {
+    "generator": ["WordPress 6.4.1"],
+    "viewport": ["width=device-width, initial-scale=1"]
+  },
+  "html": "<!DOCTYPE html><html lang=\"en\"><head><meta name=\"generator\" content=\"WordPress 6.4.1\"><link rel=\"stylesheet\" href=\"https://example.test/wp-content/themes/demo/style.css\"><script src=\"https://example.test/wp-includes/js/jquery/jquery.min.js?ver=3.4.1\"></script></head><body><div class=\"wp-block-group\"><p>Hello</p></div></body></html>",
+  "text": "Hello",
+  "scriptSrc": [
+    "https://example.test/wp-includes/js/jquery/jquery.min.js?ver=3.4.1"
+  ],
+  "scripts": [],
+  "xhr": [],
+  "js": {
+    "$.fn.jquery": "3.4.1",
+    "wp.ajax": ""
+  },
+  "dom": {},
+  "blocked": null
+}

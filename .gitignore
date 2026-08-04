@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.venv/
+
+# editor / tooling state
+.vscode/
+.claude/
+
+# scan artefacts: evidence bundles land in the project root by default,
+# while data/ and tests/fixtures/ JSON must stay tracked
+/*.json
+*.csv
+*.db
+
+PLAN.md
