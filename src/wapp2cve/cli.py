@@ -84,7 +84,7 @@ def get_api_key() -> str:
     key = prompt.ask_api_key()
     save_api_key(key)
     if not key:
-        print("  Continuing in slow mode (5 requests / 30s).")
+        print("  Continuing in slow mode (5 requests / 30s).", file=sys.stderr)
     return key
 
 
@@ -93,7 +93,7 @@ def save_api_key(key: str) -> None:
     config = read_config()
     config["api_key"] = key.strip()
     write_config(config)
-    print(f"  Key saved to {CONFIG_FILE} (--api-key replaces it)")
+    print(f"  Key saved to {CONFIG_FILE} (--api-key replaces it)", file=sys.stderr)
 
 
 def classify(detections, versions: dict[str, str]) -> tuple[list, list]:
@@ -178,7 +178,7 @@ def run(args: argparse.Namespace) -> int:
     else:
         url = args.url
         js_paths, dom_rules = query_plan(technologies)
-        print(f"[*] Loading {url}")
+        print(f"[*] Loading {url}", file=sys.stderr)
         evidence = collector.collect(
             url, js_paths, dom_rules, login=args.login, timeout=args.timeout
         )
@@ -186,7 +186,7 @@ def run(args: argparse.Namespace) -> int:
 
     if args.save_evidence:
         collector.save(evidence, Path(args.save_evidence))
-        print(f"[*] Evidence bundle written to {args.save_evidence}")
+        print(f"[*] Evidence bundle written to {args.save_evidence}", file=sys.stderr)
 
     if evidence.get("blocked"):
         print(
@@ -198,7 +198,8 @@ def run(args: argparse.Namespace) -> int:
 
     detections = match(evidence, technologies)
     if not detections:
-        print("No technologies detected.")
+        # --json has to answer with JSON even when there is nothing to report.
+        print(report.render_json(url, []) if args.json else "No technologies detected.")
         return 0
 
     versions: dict[str, str] = {}
@@ -213,7 +214,7 @@ def run(args: argparse.Namespace) -> int:
                 key = virtual_match_string(base, version)
                 cves = cache.get(key)
                 if cves is None:
-                    print(f"[*] Querying NVD for {det.name} {version}")
+                    print(f"[*] Querying NVD for {det.name} {version}", file=sys.stderr)
                     try:
                         cves = client.cves_for(key)
                     except NvdError as exc:

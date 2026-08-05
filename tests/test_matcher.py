@@ -25,7 +25,7 @@ from wapp2cve.cpe import (  # noqa: E402
     virtual_match_string,
 )
 from wapp2cve.matcher import match, query_plan, resolve_version  # noqa: E402
-from wapp2cve.nvd import NvdClient  # noqa: E402
+from wapp2cve.nvd import NvdClient, parse_cve  # noqa: E402
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -198,7 +198,9 @@ class ApiKeyStorageTest(unittest.TestCase):
             cli.CONFIG_DIR = Path(tmp) / ".wapp2cve"
             cli.CONFIG_FILE = cli.CONFIG_DIR / "config"
             try:
-                with contextlib.redirect_stdout(io.StringIO()):
+                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(
+                    io.StringIO()
+                ):
                     body(cli)
             finally:
                 cli.CONFIG_DIR, cli.CONFIG_FILE = original
@@ -305,6 +307,111 @@ class ReportTest(unittest.TestCase):
         ]
         self.assertIn("+15 more, use --all to see them", report.render("u", results))
         self.assertNotIn("more, use --all", report.render("u", results, show_all=True))
+
+
+class CvssMetricTest(unittest.TestCase):
+    """NVD scores on 3.1; a 4.0 entry is a second opinion, not a replacement."""
+
+    @staticmethod
+    def _cve(**metrics):
+        payload = {"id": "CVE-2025-1217", "descriptions": [{"lang": "en", "value": "x"}]}
+        payload["metrics"] = {
+            key: [{"type": "Primary" if key == "cvssMetricV31" else "Secondary",
+                   "cvssData": {"baseScore": score, "baseSeverity": "MEDIUM",
+                                "vectorString": f"{key}-vector"}}]
+            for key, score in metrics.items()
+        }
+        return payload
+
+    def test_v31_stays_the_headline_when_both_exist(self):
+        parsed = parse_cve(self._cve(cvssMetricV31=3.1, cvssMetricV40=6.3))
+        self.assertEqual(parsed["score"], 3.1)
+        self.assertEqual(parsed["metric"], "v3.1")
+        self.assertEqual(parsed["score_v40"], 6.3)
+
+    def test_v40_is_used_when_it_is_the_only_score(self):
+        parsed = parse_cve(self._cve(cvssMetricV40=6.3))
+        self.assertEqual(parsed["score"], 6.3)
+        self.assertEqual(parsed["metric"], "v4.0")
+
+    def test_no_metrics_at_all(self):
+        parsed = parse_cve({"id": "CVE-2025-0001"})
+        self.assertIsNone(parsed["score"])
+        self.assertIsNone(parsed["score_v40"])
+        self.assertEqual(parsed["metric"], "")
+
+
+class Cvss40ColumnTest(unittest.TestCase):
+    def _render(self, cve):
+        return report.render(
+            "u", [report.TechResult(name="PHP", status=report.QUERIED, version="8.1.2", cves=[cve])]
+        )
+
+    def test_both_scores_are_shown_side_by_side(self):
+        text = self._render(
+            {"id": "CVE-2025-1217", "score": 3.1, "metric": "v3.1", "score_v40": 6.3, "summary": "x"}
+        )
+        self.assertIn("3.1", text)
+        self.assertIn("v4:6.3", text)
+        self.assertIn("[CVSS]", text)
+
+    def test_nothing_extra_without_a_v40_score(self):
+        text = self._render({"id": "CVE-2021-23017", "score": 9.4, "metric": "v3.1", "summary": "x"})
+        self.assertNotIn("v4:", text)
+        self.assertNotIn("[CVSS]", text)
+
+    def test_a_v40_only_cve_is_not_printed_twice(self):
+        text = self._render(
+            {"id": "CVE-2025-1217", "score": 6.3, "metric": "v4.0", "score_v40": 6.3, "summary": "x"}
+        )
+        self.assertNotIn("v4:", text)
+
+
+class JsonOutputTest(unittest.TestCase):
+    """--json feeds pipelines, so stdout has to parse on its own."""
+
+    def test_render_json_round_trips(self):
+        results = [
+            report.TechResult(
+                name="PHP",
+                status=report.QUERIED,
+                version="8.1.2",
+                cves=[{"id": "CVE-2025-1217", "score": 3.1, "score_v40": 6.3, "summary": "café"}],
+            ),
+            report.TechResult(name="Cloudflare", status=report.NO_VERSION),
+        ]
+        raw = report.render_json("https://example.test/", results)
+        self.assertIn("café", raw)  # ensure_ascii=False: summaries stay readable
+        parsed = json.loads(raw)
+        self.assertEqual(parsed["url"], "https://example.test/")
+        self.assertEqual(parsed["results"][0]["cves"][0]["score_v40"], 6.3)
+        self.assertEqual(parsed["results"][1]["status"], report.NO_VERSION)
+
+    def test_empty_results_are_still_json(self):
+        self.assertEqual(json.loads(report.render_json("u", []))["results"], [])
+
+    def test_status_messages_keep_off_stdout(self):
+        import contextlib
+        import io
+        import tempfile
+
+        from wapp2cve.cli import build_parser, run
+
+        evidence = {"url": "https://empty.test/", "final_url": "https://empty.test/", "status": 200,
+                    "headers": {}, "cookies": {}, "meta": {}, "html": "<html></html>", "text": "",
+                    "scriptSrc": [], "scripts": [], "xhr": [], "js": {}, "dom": {}, "blocked": None}
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = Path(tmp) / "evidence.json"
+            bundle.write_text(json.dumps(evidence), encoding="utf-8")
+            copy = Path(tmp) / "copy.json"
+            args = build_parser().parse_args(
+                ["--from-evidence", str(bundle), "--json", "--save-evidence", str(copy)]
+            )
+            out, err = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                self.assertEqual(run(args), 0)
+        json.loads(out.getvalue())  # raises if a status line leaked into stdout
+        self.assertIn("[*]", err.getvalue())
 
 
 if __name__ == "__main__":

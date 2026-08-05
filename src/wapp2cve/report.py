@@ -46,9 +46,12 @@ def render(url: str, results: list[TechResult], show_all: bool = False) -> str:
             lines.append("  no CVEs found")
             continue
         shown = result.cves if show_all else result.cves[:DEFAULT_LIMIT]
+        # The extra column only costs width where a CVSS 4.0 score exists.
+        with_v40 = any(_v40(c) for c in shown)
         for cve in shown:
             score = f"{cve['score']:.1f}" if cve.get("score") is not None else " -- "
-            lines.append(f"  {cve['id']:<18}{score:>5}  {_short(cve.get('summary', ''))}")
+            extra = f"{_v40(cve):>9}" if with_v40 else ""
+            lines.append(f"  {cve['id']:<18}{score:>5}{extra}  {_short(cve.get('summary', ''))}")
         hidden = len(result.cves) - len(shown)
         if hidden > 0:
             lines.append(f"  +{hidden} more, use --all to see them")
@@ -56,6 +59,25 @@ def render(url: str, results: list[TechResult], show_all: bool = False) -> str:
     lines.append("")
     lines.extend(_footer(results))
     return "\n".join(lines)
+
+
+def render_json(url: str, results: list[TechResult]) -> str:
+    """The same data, machine readable. Never truncated: --all is implied."""
+    out = {
+        "url": url,
+        "results": [
+            {
+                "name": r.name,
+                "status": r.status,
+                "version": r.version,
+                "cves": r.cves,
+                "note": r.note,
+                "confidence": r.confidence,
+            }
+            for r in results
+        ],
+    }
+    return json.dumps(out, indent=2, ensure_ascii=False)
 
 
 def _footer(results: list[TechResult]) -> list[str]:
@@ -83,7 +105,17 @@ def _footer(results: list[TechResult]) -> list[str]:
         lines.append(f"              {names(NO_CPE)}")
     for result in grouped.get(ERROR, []):
         lines.append(f"[ERROR]       {result.name}: {result.note}")
+    if any(_v40(cve) for result in results for cve in result.cves):
+        lines.append("[CVSS]        main score is NVD's primary metric; v4:x.x is the CVSS 4.0 one")
     return lines
+
+
+def _v40(cve: dict) -> str:
+    """The CVSS 4.0 score, shown only when it is not already the main score."""
+    score = cve.get("score_v40")
+    if score is None or cve.get("metric") == "v4.0":
+        return ""
+    return f"v4:{score:.1f}"
 
 
 def _top_score(result: TechResult) -> float:
@@ -93,22 +125,4 @@ def _top_score(result: TechResult) -> float:
 def _short(summary: str, width: int = 70) -> str:
     summary = " ".join(summary.split())
     return summary if len(summary) <= width else summary[: width - 1] + "..."
-
-
-def render_json(url: str, results: list[TechResult]) -> str:
-    out = {
-        "url": url,
-        "results": [
-            {
-                "name": r.name,
-                "status": r.status,
-                "version": r.version,
-                "cves": r.cves,
-                "note": r.note,
-                "confidence": r.confidence,
-            }
-            for r in results
-        ]
-    }
-    return json.dumps(out, indent=2, ensure_ascii=False)
 

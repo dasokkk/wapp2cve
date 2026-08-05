@@ -59,7 +59,7 @@ but there is no window to log in through.
 wapp2cve https://site.com
 wapp2cve https://site.com --login          # visible browser, log in, press Enter
 wapp2cve https://site.com --all            # don't truncate long CVE lists
-wapp2cve https://site.com --json           # output results as JSON
+wapp2cve https://site.com --json | jq      # machine readable output on stdout
 wapp2cve https://site.com --no-cache       # skip the NVD cache
 wapp2cve --update-fingerprints             # refresh the fingerprint dataset
 ```
@@ -68,7 +68,7 @@ wapp2cve --update-fingerprints             # refresh the fingerprint dataset
 |---|---|
 | `--login` | Opens a visible browser, waits while you log in, and scans whatever page you land on. The interesting software usually lives behind the login, not on the marketing homepage. |
 | `--all` | Long CVE lists are cut at 10 entries by default; this prints all of them. |
-| `--json` | Outputs the final results in JSON format instead of plain text, useful for automation and pipelines. |
+| `--json` | Prints the results as JSON instead of plain text. Progress lines go to stderr, so stdout is always parseable on its own. Nothing is truncated, which makes `--all` redundant here. |
 | `--no-cache` | Ignores the SQLite cache and refetches everything from NVD. |
 | `--timeout` | Page load timeout in milliseconds (default 30000). |
 | `--api-key KEY` | Saves an NVD API key, replacing any stored one. An empty string clears it. |
@@ -135,6 +135,10 @@ signature, wapp2cve says the results are untrustworthy and points you at `--logi
 - A handful of patterns use JS-only regex syntax (variable-length lookbehind) and cannot be
   compiled in Python, so they are dropped. A test keeps that below 2%.
 - CVEs with no CVSS score render as `--` and sort last.
+- The score shown is NVD's primary metric, which is CVSS 3.1 for nearly everything. Where a CVE
+  also carries a CVSS 4.0 score, that one usually comes from the vendor and sits on a scale that
+  is not comparable, so it is printed beside the main score as `v4:x.x` rather than replacing it
+  (`score_v40` in JSON, alongside `metric` naming the scale the main score uses).
 
 ## Tests
 

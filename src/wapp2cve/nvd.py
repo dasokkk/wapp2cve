@@ -15,6 +15,17 @@ INTERVAL_WITHOUT_KEY = 30 / 5
 
 _RETRY_STATUS = {403, 429, 500, 502, 503, 504}
 
+# NVD's own analysis is CVSS 3.1. A 4.0 entry, when there is one, is almost
+# always the vendor's own score on a scale that is not comparable, so 3.1 stays
+# the headline number and 4.0 is carried alongside it.
+_METRIC_PREFERENCE = ("cvssMetricV31", "cvssMetricV30", "cvssMetricV40", "cvssMetricV2")
+_METRIC_NAMES = {
+    "cvssMetricV31": "v3.1",
+    "cvssMetricV30": "v3.0",
+    "cvssMetricV40": "v4.0",
+    "cvssMetricV2": "v2.0",
+}
+
 
 class NvdError(RuntimeError):
     pass
@@ -95,27 +106,39 @@ def parse_cve(cve: dict) -> dict | None:
     cve_id = cve.get("id")
     if not cve_id:
         return None
-    score, severity, vector = _best_metric(cve.get("metrics") or {})
+    metrics = cve.get("metrics") or {}
+    score, severity, vector, metric = _best_metric(metrics)
     return {
         "id": cve_id,
         "score": score,
         "severity": severity,
         "vector": vector,
+        "metric": metric,
+        "score_v40": _score_of(_first(metrics, "cvssMetricV40")),
         "summary": _description(cve),
         "published": (cve.get("published") or "")[:10],
     }
 
 
-def _best_metric(metrics: dict) -> tuple[float | None, str, str]:
-    for key in ("cvssMetricV40", "cvssMetricV31", "cvssMetricV30", "cvssMetricV2"):
-        entries = metrics.get(key) or []
-        if not entries:
+def _best_metric(metrics: dict) -> tuple[float | None, str, str, str]:
+    for key in _METRIC_PREFERENCE:
+        entry = _first(metrics, key)
+        if entry is None:
             continue
-        data = entries[0].get("cvssData") or {}
-        score = data.get("baseScore")
-        severity = data.get("baseSeverity") or entries[0].get("baseSeverity") or ""
-        return (float(score) if score is not None else None, severity, data.get("vectorString", ""))
-    return (None, "", "")
+        data = entry.get("cvssData") or {}
+        severity = data.get("baseSeverity") or entry.get("baseSeverity") or ""
+        return (_score_of(entry), severity, data.get("vectorString", ""), _METRIC_NAMES[key])
+    return (None, "", "", "")
+
+
+def _first(metrics: dict, key: str) -> dict | None:
+    entries = metrics.get(key) or []
+    return entries[0] if entries else None
+
+
+def _score_of(entry: dict | None) -> float | None:
+    score = ((entry or {}).get("cvssData") or {}).get("baseScore")
+    return float(score) if score is not None else None
 
 
 def _description(cve: dict) -> str:
