@@ -59,6 +59,7 @@ but there is no window to log in through.
 wapp2cve https://site.com
 wapp2cve https://site.com --login          # visible browser, log in, press Enter
 wapp2cve https://site.com --all            # don't truncate long CVE lists
+wapp2cve https://site.com --json           # output results as JSON
 wapp2cve https://site.com --no-cache       # skip the NVD cache
 wapp2cve --update-fingerprints             # refresh the fingerprint dataset
 ```
@@ -67,6 +68,7 @@ wapp2cve --update-fingerprints             # refresh the fingerprint dataset
 |---|---|
 | `--login` | Opens a visible browser, waits while you log in, and scans whatever page you land on. The interesting software usually lives behind the login, not on the marketing homepage. |
 | `--all` | Long CVE lists are cut at 10 entries by default; this prints all of them. |
+| `--json` | Outputs the final results in JSON format instead of plain text, useful for automation and pipelines. |
 | `--no-cache` | Ignores the SQLite cache and refetches everything from NVD. |
 | `--timeout` | Page load timeout in milliseconds (default 30000). |
 | `--api-key KEY` | Saves an NVD API key, replacing any stored one. An empty string clears it. |
