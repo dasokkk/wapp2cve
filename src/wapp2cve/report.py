@@ -6,6 +6,7 @@ greppable. Grouped by technology, CVSS descending within each group.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 
 DEFAULT_LIMIT = 10
@@ -92,3 +93,22 @@ def _top_score(result: TechResult) -> float:
 def _short(summary: str, width: int = 70) -> str:
     summary = " ".join(summary.split())
     return summary if len(summary) <= width else summary[: width - 1] + "..."
+
+
+def render_json(url: str, results: list[TechResult]) -> str:
+    out = {
+        "url": url,
+        "results": [
+            {
+                "name": r.name,
+                "status": r.status,
+                "version": r.version,
+                "cves": r.cves,
+                "note": r.note,
+                "confidence": r.confidence,
+            }
+            for r in results
+        ]
+    }
+    return json.dumps(out, indent=2, ensure_ascii=False)
+

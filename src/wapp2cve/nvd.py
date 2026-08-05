@@ -107,7 +107,7 @@ def parse_cve(cve: dict) -> dict | None:
 
 
 def _best_metric(metrics: dict) -> tuple[float | None, str, str]:
-    for key in ("cvssMetricV31", "cvssMetricV30", "cvssMetricV40", "cvssMetricV2"):
+    for key in ("cvssMetricV40", "cvssMetricV31", "cvssMetricV30", "cvssMetricV2"):
         entries = metrics.get(key) or []
         if not entries:
             continue

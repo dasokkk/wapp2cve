@@ -30,6 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="open a visible browser, wait for you to log in, then scan that page",
     )
     parser.add_argument("--all", action="store_true", help="do not truncate long CVE lists")
+    parser.add_argument("--json", action="store_true", help="output results in JSON format")
     parser.add_argument(
         "--api-key",
         metavar="KEY",
@@ -236,8 +237,11 @@ def run(args: argparse.Namespace) -> int:
                     )
                 )
 
-    print()
-    print(report.render(url, results, show_all=args.all))
+    if args.json:
+        print(report.render_json(url, results))
+    else:
+        print()
+        print(report.render(url, results, show_all=args.all))
     return 0
 
 
